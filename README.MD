@@ -1,4 +1,5 @@
-# NexTrip Gen-AI enhanced Trip Planning Application
+# NexTrip 
+Gen-AI enhanced Trip Planning Application
 
 This project is designed to help long-haul drivers by recommending rest stops at regular intervals along their route. The app uses **Python (FastAPI)** for the backend and **Google Maps APIs** for route and location services. An AI-powered chatbot provides tailored stop suggestions.
 
