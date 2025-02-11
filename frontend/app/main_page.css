@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+.container_ball {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    height: 70vh;
+    padding-top: 13%;
+}
+
+.box {
+    border-radius: 50%;
+}
+
+.black-circle {
+    width: 200;
+    height: 200;
+    background-color: #e047ff;
+    z-index: 1;
+}
+
+.red-circle {
+    width: 210;
+    height: 210;
+    background-color: #000000;
+    transform: translateY(-205px);
+    z-index: 2;
+    /* 让红色圆向上移动，部分覆盖黑色圆 */
+}
