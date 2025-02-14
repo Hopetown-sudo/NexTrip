@@ -1,0 +1,11 @@
+faster-whisper
+fastapi
+uvicorn
+python-dotenv
+openai
+librosa
+soundfile
+torch
+torchaudi
+ffmpeg-python
+googlemaps

@@ -2,7 +2,6 @@ import googlemaps
 import os
 GMAPS_API_KEY = os.getenv("GOOGLE_MAP_API_KEY")
 gmaps = googlemaps.Client(key=GMAPS_API_KEY)
-print (GMAPS_API_KEY)
 
 def get_route(origin: str, destination: str):
     """
