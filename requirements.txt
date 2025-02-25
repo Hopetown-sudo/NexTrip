@@ -6,6 +6,6 @@ openai
 librosa
 soundfile
 torch
-torchaudi
+torchaudio
 ffmpeg-python
 googlemaps

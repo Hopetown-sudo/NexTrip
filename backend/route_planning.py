@@ -1,5 +1,7 @@
 import googlemaps
 import os
+from dotenv import load_dotenv
+load_dotenv()
 GMAPS_API_KEY = os.getenv("GOOGLE_MAP_API_KEY")
 gmaps = googlemaps.Client(key=GMAPS_API_KEY)
 

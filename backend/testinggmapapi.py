@@ -1,5 +1,7 @@
 import requests
 import os
+from dotenv import load_dotenv
+load_dotenv()
 api_key = os.getenv("GOOGLE_MAP_API_KEY")
 
 def get_geocode(api_key, address):

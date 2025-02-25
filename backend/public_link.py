@@ -4,3 +4,5 @@ from pyngrok import ngrok
 public_url = ngrok.connect(3000)
 
 print(f"Public URL: {public_url}")
+
+#ngrok http http://localhost:9000

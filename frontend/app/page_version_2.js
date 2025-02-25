@@ -12,20 +12,10 @@ export default function AudioReactiveBall() {
     const maxScale = 1.2;
     const websocketRef = useRef(null); // 使用 useRef 来存储 websocket
     const recorderRef = useRef(null); // 用于存储当前的 MediaRecorder 实例
-    const audioRef = useRef(null); // 初始化为null
-    const audioProcessorRef = useRef(null); // 添加这一行来保存音频处理器引用
-    let mediaRecorder;
-
-    // 使用 ref 来跟踪当前状态
-    const isAudioStartedRef = useRef(isAudioStarted);
-    
-    // 更新 ref 当状态变化时
-    useEffect(() => {
-        isAudioStartedRef.current = isAudioStarted;
-    }, [isAudioStarted]);
+    const audioRef = useRef(new Audio()); // 用来存储音频对象
 
     useEffect(() => {
-        const ws = new WebSocket('wss://21ed-24-213-201-196.ngrok-free.app/asr');
+        const ws = new WebSocket('wss://096f-24-213-201-196.ngrok-free.app/asr');
 
         ws.onopen = () => {
             console.log('WebSocket connected');
@@ -37,8 +27,8 @@ export default function AudioReactiveBall() {
 
         websocketRef.current = ws; // 存储 WebSocket 到 useRef
 
-        const SILENT_THRESHOLD = 0.016;
-        const STOP_THRESHOLD = 0.05;
+        const SILENT_THRESHOLD = 0.012;
+        const STOP_THRESHOLD = 0.03;
 
         let currentLoudness = 0;
   
@@ -76,23 +66,9 @@ export default function AudioReactiveBall() {
                 audioContext.audioWorklet.addModule('audio_processor.js').then(() => {
                     const processor = new AudioWorkletNode(audioContext, 'audio_processor');
                     source.connect(processor);
-                    // 去掉下面这行以避免回声
-                    // processor.connect(audioContext.destination);
-                    
-                    // 保存引用以便稍后清理
-                    audioProcessorRef.current = {
-                        processor,
-                        source,
-                        audioContext,
-                        stream
-                    };
+                    processor.connect(audioContext.destination);
 
                     processor.port.onmessage = (e) => {
-                        if (!isAudioStartedRef.current) {
-                            setScale(1); // 如果音频停止，重置小球大小
-                            return;
-                        }
-                        
                         const loudness = e.data.loudness;
                         currentLoudness = loudness;
                         const newScale = Math.min(1 + loudness * 3, maxScale);
@@ -109,16 +85,18 @@ export default function AudioReactiveBall() {
 
                 //const options = { mimeType: 'audio/mp4' };
 
-                if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+                if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9")) {
                     //var options = { mimeType: "audio/webm; codecs=opus" };
-                    var options = { mimeType: "audio/webm;codecs=opus" };
+                    var options = { mimeType: "video/webm;codecs=vp9" };
                     //var options = { mimeType: "video/mp4", videoBitsPerSecond: 1000000 };
                 } else if (MediaRecorder.isTypeSupported("video/mp4")) {
-                    var options = { mimeType: "audio/webm;codecs=opus" };
+                    var options = { mimeType: "video/webm;codecs=vp9" };
                 } else {
                     console.warn("当前浏览器不支持 WebM 或 MP4 录制");
                     var options = {};
                 }
+
+                let mediaRecorder;
 
                 try {
                     mediaRecorder = new MediaRecorder(stream, options);
@@ -126,24 +104,6 @@ export default function AudioReactiveBall() {
                 } catch (err) {
                     console.error('MediaRecorder 初始化失败:', err);
                     return;
-                }
-
-                function startRecording() {
-                    try {
-                        if (!isAudioStartedRef.current) {
-                            console.log("录音已暂停");
-                            return;
-                        }
-                        mediaRecorder.start();
-                        console.log("开始录制新片段");
-                        setTimeout(() => {
-                            if (mediaRecorder.state === 'recording') {
-                                mediaRecorder.stop();
-                            }
-                        }, segmentDuration);
-                    } catch (err) {
-                        console.error("录制出错:", err);
-                    }
                 }
 
                 let chunks = [];
@@ -157,19 +117,13 @@ export default function AudioReactiveBall() {
                 const segmentDuration = 250;
 
                 mediaRecorder.addEventListener("stop", () => {
-                    // 使用 ref 获取最新状态
-                    if (!isAudioStartedRef.current) {
-                        console.log("录音已停止，不再继续录制");
-                        chunks = [];
-                        return; // 不再调用 startRecording
-                    }
-                    
                     if (currentLoudness < SILENT_THRESHOLD) {
                         console.log("当前声音过低，不发送数据");
                         chunks = [];
                         startRecording();
                     } else {
                         const completeBlob = new Blob(chunks, { type: options.mimeType });
+                        console.log("准备发送完整的 webm 语音数据:", completeBlob);
                         if (websocketRef.current?.readyState === WebSocket.OPEN) {
                             websocketRef.current.send(completeBlob);
                             console.log("已发送完整 webm 语音数据到后端");
@@ -178,6 +132,18 @@ export default function AudioReactiveBall() {
                         startRecording();
                     }
                 });
+
+                function startRecording() {
+                    try {
+                        mediaRecorder.start();
+                        console.log("开始录制新片段");
+                        setTimeout(() => {
+                            mediaRecorder.stop();
+                        }, segmentDuration);
+                    } catch (err) {
+                        console.error("录制出错:", err);
+                    }
+                }
 
                 if (isRecording) {
                     startRecording();
@@ -189,97 +155,34 @@ export default function AudioReactiveBall() {
 
         return () => {
             ws.close();
-            
-            // 清理音频处理资源
-            cleanupAudioProcessor();
         };
 
     }, [isRecording, isAudioStarted]); // Add isAudioStarted to the dependency array
 
-    // 在客户端挂载后初始化音频对象
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            audioRef.current = new Audio();
-        }
-        
-        return () => {
-            // 组件卸载时释放音频资源
-            if (audioRef.current) {
-                audioRef.current.pause();
-                audioRef.current.src = '';
-            }
-        };
-    }, []);
-
-    // 添加一个清理音频处理器的函数
-    const cleanupAudioProcessor = () => {
-        if (audioProcessorRef.current) {
-            const { processor, source, audioContext, stream } = audioProcessorRef.current;
-            
-            if (processor) processor.disconnect();
-            if (source) source.disconnect();
-            if (audioContext) audioContext.close().catch(err => console.error('关闭音频上下文失败:', err));
-            if (stream) stream.getTracks().forEach(track => track.stop());
-            
-            audioProcessorRef.current = null;
-            setScale(1); // 重置球的大小
-        }
-    };
-
     const handleCircleClick = () => {
-        setIsRecording(!isRecording);
+        setIsRecording(true); // 开始录音
+        console.log('开始接收用户语音');
         
-        if (!isRecording) { // 开始录音
-            console.log('开始接收用户语音');
-            setIsAudioStarted(true);
-            
-            // 播放开始录音音效
-            if (audioRef.current) {
-                audioRef.current.src = '/sound/open.mp3';
-                audioRef.current.play()
-                    .then(() => console.log('播放开始录音音效'))
-                    .catch((error) => console.error('播放开始录音音效失败:', error));
-            }
-        } else { // 停止录音
-            console.log('停止接收用户语音');
-            setIsAudioStarted(false);
-            
-            // 停止录音
-            if (recorderRef.current && recorderRef.current.state === 'recording') {
-                recorderRef.current.stop();
-            }
-            
-            // 清理音频处理资源
-            if (audioProcessorRef.current) {
-                const { processor, source, audioContext, stream } = audioProcessorRef.current;
-                
-                if (processor) processor.disconnect();
-                if (source) source.disconnect();
-                if (audioContext) audioContext.close().catch(err => console.error('关闭音频上下文失败:', err));
-                if (stream) stream.getTracks().forEach(track => track.stop());
-                
-                audioProcessorRef.current = null;
-                
-                // 确保小球回到原始大小
-                setScale(1);
-            }
-            
-            // 播放结束录音音效
-            if (audioRef.current) {
-                audioRef.current.src = '/sound/close.mp3';
-                audioRef.current.play()
-                    .then(() => console.log('播放结束录音音效'))
-                    .catch((error) => console.error('播放结束录音音效失败:', error));
-            }
-        }
+        // 设置音频处理已开始
+        setIsAudioStarted(true); 
+
+        // 触发音频播放的“假”交互
+        const audio = audioRef.current;
+        audio.play()
+            .then(() => {
+                console.log('初次播放音频以满足浏览器交互要求');
+            })
+            .catch((error) => {
+                console.error('初次播放音频失败:', error);
+            });
 
         // 点击时缩小圆圈的效果
-        setScale(1.5);
+        setScale(1.5); // 圆圈缩小
 
         // 通过 setTimeout 恢复圆圈大小
         setTimeout(() => {
-            setScale(1);
-        }, 200);
+            setScale(1); // 恢复圆圈原始大小
+        }, 200); // 设置圆圈缩小的持续时间
     };
 
     return (
